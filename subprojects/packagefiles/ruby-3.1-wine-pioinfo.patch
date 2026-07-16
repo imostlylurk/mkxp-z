@@ -1,0 +1,147 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Date: Mon, 14 Jul 2025 00:00:00 -0400
+Subject: [PATCH] Allow running under Wine when pioinfo binary scan fails
+
+Wine's ucrtbase.dll is a clean-room reimplementation with different
+machine code than Microsoft's. Ruby's set_pioinfo_extra() scans for
+specific instruction patterns in _isatty to locate the __pioinfo table,
+and aborts via _exit(1) when the scan fails.
+
+This patch makes the failure non-fatal: when __pioinfo cannot be found,
+the macros fall back to CRT functions (_get_osfhandle) and
+rb_w32_open_osfhandle delegates directly to _open_osfhandle instead of
+using the CreateFile("NUL") + handle swap trick.
+---
+ win32/win32.c | 59 ++++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 42 insertions(+), 17 deletions(-)
+
+diff --git a/win32/win32.c b/win32/win32.c
+index 1111111..2222222 100644
+--- a/win32/win32.c
++++ b/win32/win32.c
+@@ -2555,10 +2555,11 @@
+ 
+ #define IOINFO_ARRAY_ELTS	(1 << IOINFO_L2E)
+-#define _osfhnd(i)  (_pioinfo(i)->osfhnd)
+-#define _osfile(i)  (_pioinfo(i)->osfile)
+-#define rb_acrt_lowio_lock_fh(i)   EnterCriticalSection(&_pioinfo(i)->lock)
+-#define rb_acrt_lowio_unlock_fh(i) LeaveCriticalSection(&_pioinfo(i)->lock)
++/* When __pioinfo is unavailable (Wine), use CRT fallbacks for reads */
++#define _osfhnd(i)  (__pioinfo ? _pioinfo(i)->osfhnd : (intptr_t)_get_osfhandle(i))
++#define _osfile(i)  (__pioinfo ? _pioinfo(i)->osfile : (char)0)
++#define rb_acrt_lowio_lock_fh(i)   do { if (__pioinfo) EnterCriticalSection(&_pioinfo(i)->lock); } while(0)
++#define rb_acrt_lowio_unlock_fh(i) do { if (__pioinfo) LeaveCriticalSection(&_pioinfo(i)->lock); } while(0)
+ 
+ #if RUBY_MSVCRT_VERSION >= 80
+ static size_t pioinfo_extra = 0;	/* workaround for VC++8 SP1 */
+@@ -2678,7 +2679,8 @@
+         }
+     }
+     fprintf(stderr, "unexpected " UCRTBASE "\n");
+-    _exit(1);
++    /* Wine's ucrtbase.dll has different machine code; skip pioinfo entirely */
++    return;
+ 
+     found:
+     p += sizeof(PIOINFO_MARK) - 1;
+@@ -2718,8 +2720,8 @@
+ 		     (fd & (IOINFO_ARRAY_ELTS - 1)) * sizeof_ioinfo);
+ }
+ 
+-#define _set_osfhnd(fh, osfh) (void)(_osfhnd(fh) = osfh)
+-#define _set_osflags(fh, flags) (_osfile(fh) = (flags))
++#define _set_osfhnd(fh, osfh) do { if (__pioinfo) _pioinfo(fh)->osfhnd = (osfh); } while(0)
++#define _set_osflags(fh, flags) do { if (__pioinfo) _pioinfo(fh)->osfile = (flags); } while(0)
+ 
+ #define FOPEN			0x01	/* file handle open */
+ #define FEOFLAG			0x02	/* end of file has been encountered */
+@@ -2745,18 +2747,28 @@
+ {
+     int fh;
+     char fileflags;		/* _osfile flags */
+-    HANDLE hF;
+ 
+     /* copy relevant flags from second parameter */
+     fileflags = FDEV;
+ 
+-    if (flags & O_APPEND)
+-	fileflags |= FAPPEND;
+-
+-    if (flags & O_TEXT)
+-	fileflags |= FTEXT;
+-
+-    if (flags & O_NOINHERIT)
+-	fileflags |= FNOINHERIT;
+-
+-    /* attempt to allocate a C Runtime file handle */
+-    hF = CreateFile("NUL", 0, 0, NULL, OPEN_ALWAYS, 0, NULL);
+-    fh = _open_osfhandle((intptr_t)hF, 0);
+-    CloseHandle(hF);
+-    if (fh == -1) {
+-	errno = EMFILE;		/* too many open files */
+-	_doserrno = 0L;		/* not an OS error */
+-    }
+-    else {
+-
+-	rb_acrt_lowio_lock_fh(fh);
+-	/* the file is open. now, set the info in _osfhnd array */
+-	_set_osfhnd(fh, osfhandle);
+-
+-	fileflags |= FOPEN;		/* mark as open */
+-
+-	_set_osflags(fh, fileflags); /* set osfile entry */
+-	rb_acrt_lowio_unlock_fh(fh);
+-    }
+-    return fh;			/* return handle */
++    if (flags & O_APPEND)
++	fileflags |= FAPPEND;
++
++    if (flags & O_TEXT)
++	fileflags |= FTEXT;
++
++    if (flags & O_NOINHERIT)
++	fileflags |= FNOINHERIT;
++
++    if (__pioinfo) {
++        HANDLE hF;
++        /* attempt to allocate a C Runtime file handle */
++        hF = CreateFile("NUL", 0, 0, NULL, OPEN_ALWAYS, 0, NULL);
++        fh = _open_osfhandle((intptr_t)hF, 0);
++        CloseHandle(hF);
++        if (fh == -1) {
++            errno = EMFILE;		/* too many open files */
++            _doserrno = 0L;		/* not an OS error */
++        }
++        else {
++            rb_acrt_lowio_lock_fh(fh);
++            /* the file is open. now, set the info in _osfhnd array */
++            _set_osfhnd(fh, osfhandle);
++            fileflags |= FOPEN;		/* mark as open */
++            _set_osflags(fh, fileflags); /* set osfile entry */
++            rb_acrt_lowio_unlock_fh(fh);
++        }
++    }
++    else {
++        /* Wine path: let CRT handle fd allocation directly */
++        fh = _open_osfhandle(osfhandle, fileflags | FOPEN);
++        if (fh == -1) {
++            errno = EMFILE;
++            _doserrno = 0L;
++        }
++    }
++    return fh;			/* return handle */
+ }
+ 
+ /* License: Ruby's */
+@@ -4491,9 +4504,9 @@
+ 	    return -1;
+ 	}
+ 	if (arg & FD_CLOEXEC)
+-	    _osfile(fd) |= FNOINHERIT;
++	    _set_osflags(fd, _osfile(fd) | FNOINHERIT);
+ 	else
+-	    _osfile(fd) &= ~FNOINHERIT;
++	    _set_osflags(fd, _osfile(fd) & ~FNOINHERIT);
+ 	return 0;
+       }
+       default:
