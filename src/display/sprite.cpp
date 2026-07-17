@@ -1101,6 +1101,19 @@ void Sprite::draw()
             base = &shader;
         }
             break;
+        case NIS:
+        {
+            NisSpriteShader &shader = shState->shaders().nisSprite;
+            shader.bind();
+
+            shader.setTexSize(Vec2i(sourceWidthHires, sourceHeightHires));
+            shader.setTargetScale(Vec2((float)(shState->config().textureScalingFactor), (float)(shState->config().textureScalingFactor)));
+            shader.setSharpness(shState->config().nisSharpness);
+            shader.setSpriteMat(p->trans.getMatrix());
+            shader.applyViewportProj();
+            base = &shader;
+        }
+            break;
 #endif
         default:
         {

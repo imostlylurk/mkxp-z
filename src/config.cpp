@@ -146,6 +146,7 @@ void Config::read(int argc, char *argv[]) {
         {"bicubicSharpness", 100},
 #ifdef MKXPZ_HAVE_EXTRA_SHADERS
         {"xbrzScalingFactor", 1.},
+        {"nisSharpness", 0.5},
 #endif
         {"enableHires", false},
         {"textureScalingFactor", 1.},
@@ -290,6 +291,7 @@ try { exp } catch (...) {}
     SET_OPT(bicubicSharpness, integer);
 #ifdef MKXPZ_HAVE_EXTRA_SHADERS
     SET_OPT(xbrzScalingFactor, integer);
+    SET_OPT(nisSharpness, number);
 #endif
     SET_OPT(enableHires, boolean);
     SET_OPT(textureScalingFactor, number);

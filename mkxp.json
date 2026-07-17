@@ -104,6 +104,7 @@
     // 2: Bicubic
     // 3: Lanczos3
     // 4: xBRZ
+    // 5: Nvidia Image Scaler
     // (default: 0)
     //
     // "smoothScaling": 0,
@@ -152,6 +153,13 @@
     // (default: 1.0)
     //
     // "xbrzScalingFactor": 4.0,
+
+
+    // Nvidia Image scaler sharpness value
+    // Set higher for stronger sharpening at the risk of ringing.
+    // (default 0.5)
+    //
+    // "nisSharpness": 0.5,
 
 
     // Replace the game's Bitmap files with external high-res files

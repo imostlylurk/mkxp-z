@@ -239,6 +239,18 @@ static void _blitBegin(FBO::ID fbo, const Vec2i &size, int scaleIsSpecial)
 		}
 
 			break;
+		case NIS:
+		{
+			NisShader &shader = shState->shaders().nis;
+			shader.bind();
+			shader.applyViewportProj();
+			shader.setTranslation(Vec2i());
+			shader.setTexSize(Vec2i(size.x, size.y));
+			shader.setTargetScale(Vec2(1., 1.));
+			shader.setSharpness(shState->config().nisSharpness);
+		}
+
+			break;
 #endif
 		default:
 		{
@@ -335,6 +347,15 @@ void blitSource(TEXFBO &source, int scaleIsSpecial)
 		}
 
 			break;
+		case NIS:
+		{
+			NisShader &shader = shState->shaders().nis;
+			shader.bind();
+			shader.setTexSize(Vec2i(blitSrcWidthHires, blitSrcHeightHires));
+			shader.setSharpness(shState->config().nisSharpness);
+		}
+
+			break;
 #endif
 		default:
 		{
@@ -386,6 +407,12 @@ void blitRectangle(const IntRect &src, const IntRect &dst, bool smooth)
 		{
 			XbrzShader &shader = shState->shaders().xbrz;
 			shader.setTargetScale(Vec2((float)(shState->config().xbrzScalingFactor), (float)(shState->config().xbrzScalingFactor)));
+		}
+		if (shState->config().smoothScaling == NIS)
+		{
+			NisShader &shader = shState->shaders().nis;
+			shader.setTargetScale(Vec2((float)(shState->config().textureScalingFactor), (float)(shState->config().textureScalingFactor)));
+			shader.setSharpness(shState->config().nisSharpness);
 		}
 #endif
 		if (smooth)

@@ -208,6 +208,7 @@ enum InterpolationMethod
 	Lanczos3 = 3,
 #ifdef MKXPZ_HAVE_EXTRA_SHADERS
 	xBRZ = 4,
+	NIS = 5,
 #endif
 };
 

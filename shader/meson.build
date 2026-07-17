@@ -40,6 +40,7 @@ if have_extra_shaders
     gplv3_features += 'Extra shaders'
     global_args += '-DMKXPZ_HAVE_EXTRA_SHADERS'
     embedded_shaders += 'xbrz.frag'
+    embedded_shaders += 'nis.frag'
 endif
 
 foreach shader : embedded_shaders

@@ -408,6 +408,19 @@ public:
 protected:
 	GLint u_targetScale;
 };
+
+class NisShader : public Lanczos3Shader
+{
+public:
+	NisShader();
+
+	void setTargetScale(const Vec2 &value);
+	void setSharpness(float value);
+
+protected:
+	GLint u_targetScale;
+	GLint u_sharpness;
+};
 #endif
 
 class Lanczos3SpriteShader : public SimpleSpriteShader
@@ -444,6 +457,19 @@ protected:
 	GLint u_targetScale;
 };
 
+class NisSpriteShader : public Lanczos3SpriteShader
+{
+public:
+	NisSpriteShader();
+
+	void setTargetScale(const Vec2 &value);
+	void setSharpness(float value);
+
+protected:
+	GLint u_targetScale;
+	GLint u_sharpness;
+};
+
 /* Global object containing all available shaders */
 struct ShaderSet
 {
@@ -474,11 +500,13 @@ struct ShaderSet
 	Lanczos3Shader lanczos3;
 #ifdef MKXPZ_HAVE_EXTRA_SHADERS
 	XbrzShader xbrz;
+	NisShader nis;
 #endif
 	Lanczos3SpriteShader lanczos3Sprite;
 	BicubicSpriteShader bicubicSprite;
 #ifdef MKXPZ_HAVE_EXTRA_SHADERS
 	XbrzSpriteShader xbrzSprite;
+	NisSpriteShader nisSprite;
 #endif
 };
 

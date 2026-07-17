@@ -55,6 +55,7 @@ struct Config {
     int bicubicSharpness;
 #ifdef MKXPZ_HAVE_EXTRA_SHADERS
     double xbrzScalingFactor;
+    double nisSharpness;
 #endif
     bool enableHires;
     double textureScalingFactor;
